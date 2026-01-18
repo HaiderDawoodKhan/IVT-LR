@@ -9,17 +9,17 @@
 
   <!-- Project Page -->
   <a href="https://github.com/ModalityDance/IVT-LR">
-    <img src="[https://img.shields.io/badge/Project-Page-6a5acd?style=for-the-badge]" alt="Project Page">
+    <img src="https://img.shields.io/badge/Project-Page-6a5acd?style=for-the-badge" alt="Project Page">
   </a>
 
   <!-- Paper Link -->
   <a href="https://arxiv.org/abs/2510.12603">
-    <img src="[https://img.shields.io/badge/Paper-arXiv-b31b1b?style=for-the-badge&logo=arxiv]" alt="Paper">
+    <img src="https://img.shields.io/badge/Paper-arXiv-b31b1b?style=for-the-badge&logo=arxiv" alt="Paper">
   </a>
 
   <!-- HuggingFace Models -->
   <a href="https://huggingface.co/FYYDCC/IVTLR">
-    <img src="[https://img.shields.io/badge/HuggingFace-Models-fcc21b?style=for-the-badge&logo=huggingface&logoColor=white]" alt="HF Models">
+    <img src="https://img.shields.io/badge/HuggingFace-Models-fcc21b?style=for-the-badge&logo=huggingface&logoColor=white" alt="HF Models">
   </a>
 
   <!-- Optional Dataset Badge -->
