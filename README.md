@@ -51,13 +51,11 @@ Points:
 
 Interleaved Vision-Text Latent Reasoning (IVT-LR) is the first VLM framework that unifies textual and visual representations in the latent space and implements multimodal latent reasoning. Specifically, IVT-LR represents each reasoning step by combining two implicit parts: ***latent text*** and ***latent vision***. We further introduce a progressive multi-stage training strategy to enable MLLMs to perform the above multimodal latent reasoning steps.
 
-![image.png](image.png)
-
 
 
 <div align="center">
   <figure>
-    <img src="./assets/overview.png" alt="Overview" style="max-width: 100%; height: auto;">
+    <img src="./assets/asset.png" alt="Overview" style="max-width: 100%; height: auto;">
     <br>
     <figcaption><em>Quick Overview of Project Name.</em></figcaption>
   </figure>
