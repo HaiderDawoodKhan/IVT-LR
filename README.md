@@ -54,21 +54,6 @@ Interleaved Vision-Text Latent Reasoning (IVT-LR) is the first VLM framework tha
 ![image.png](image.png)
 
 
-### 🪐 Key Features
-
-🧭 **Feature 1 Title**  
-Describe the core capability enabled by this feature and its role in the overall system.
-
-🌌 **Feature 2 Title**  
-Explain how this component improves effectiveness, efficiency, or modeling flexibility.
-
-🧩 **Feature 3 Title**  
-Describe how this design choice supports extensibility, ablation, or future research.
-
-
-
-### More sections if you want ...
-
 
 <div align="center">
   <figure>
