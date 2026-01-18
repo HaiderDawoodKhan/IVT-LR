@@ -22,16 +22,6 @@
     <img src="https://img.shields.io/badge/HuggingFace-Models-fcc21b?style=for-the-badge&logo=huggingface&logoColor=white" alt="HF Models">
   </a>
 
-  <!-- Optional Dataset Badge -->
-  <a href="{dataset_url}">
-    <img src="https://img.shields.io/badge/Dataset-Available-4c1?style=for-the-badge" alt="Dataset">
-  </a>
-
-  <!-- Optional Community Badges -->
-  <a href="{slack_or_discord_or_feishu}">
-    <img src="https://img.shields.io/badge/Community-Join-07c160?style=for-the-badge&logo=wechat&logoColor=white" alt="Community">
-  </a>
-
 </div>
 
 
