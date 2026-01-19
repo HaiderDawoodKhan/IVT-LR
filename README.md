@@ -252,15 +252,15 @@ If you use **IVT-LR** in your research or applications, please consider citing:
 
 <div align="center">
 
-<a href="https://github.com/{github_org}/{repo_name}">
+<a href="https://github.com/ModalityDance/IVT-LR">
   <img src="https://img.shields.io/badge/⭐ Star%20us%20on%20GitHub-181717?style=for-the-badge&logo=github&logoColor=white" />
 </a>
 
-<a href="https://github.com/{github_org}/{repo_name}/issues">
+<a href="https://github.com/ModalityDance/IVT-LR/issues">
   <img src="https://img.shields.io/badge/🐞 Report%20Issues-e74c3c?style=for-the-badge&logo=github" />
 </a>
 
-<a href="https://github.com/{github_org}/{repo_name}/discussions">
+<a href="https://github.com/ModalityDance/IVT-LR/discussions">
   <img src="https://img.shields.io/badge/💬 Discussions-20c997?style=for-the-badge&logo=github" />
 </a>
 <br/>
