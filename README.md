@@ -1,4 +1,4 @@
-<a name="readme-top"></a>
+`<a name="readme-top"></a>`
 
 <div align="center">
   <img src="./assets/LOGO.png" alt="Project Logo" width="300">
@@ -7,23 +7,25 @@
 
 <div align="center">
 
-  <!-- Project Page -->
-  <a href="https://github.com/ModalityDance/IVT-LR">
+<!-- Project Page -->
+
+<a href="https://github.com/ModalityDance/IVT-LR">
     <img src="https://img.shields.io/badge/Project-Page-6a5acd?style=for-the-badge" alt="Project Page">
   </a>
 
-  <!-- Paper Link -->
-  <a href="https://arxiv.org/abs/2510.12603">
+<!-- Paper Link -->
+
+<a href="https://arxiv.org/abs/2510.12603">
     <img src="https://img.shields.io/badge/Paper-arXiv-b31b1b?style=for-the-badge&logo=arxiv" alt="Paper">
   </a>
 
-  <!-- HuggingFace Models -->
-  <a href="https://huggingface.co/FYYDCC/IVTLR">
+<!-- HuggingFace Models -->
+
+<a href="https://huggingface.co/FYYDCC/IVTLR">
     <img src="https://img.shields.io/badge/HuggingFace-Models-fcc21b?style=for-the-badge&logo=huggingface&logoColor=white" alt="HF Models">
   </a>
 
 </div>
-
 
 <!--
 Overview
@@ -51,8 +53,6 @@ Points:
 
 Interleaved Vision-Text Latent Reasoning (IVT-LR) is the first VLM framework that unifies textual and visual representations in the latent space and implements multimodal latent reasoning. Specifically, IVT-LR represents each reasoning step by combining two implicit parts: ***latent text*** and ***latent vision***. We further introduce a progressive multi-stage training strategy to enable MLLMs to perform the above multimodal latent reasoning steps.
 
-
-
 <div align="center">
   <figure>
     <img src="./assets/image.png" alt="Overview" style="max-width: 100%; height: auto;">
@@ -60,7 +60,6 @@ Interleaved Vision-Text Latent Reasoning (IVT-LR) is the first VLM framework tha
     <figcaption><em>Quick Overview of IVT-LR.</em></figcaption>
   </figure>
 </div>
-
 
 <!--
 News 
@@ -77,7 +76,7 @@ Points:
 
 -->
 
-## 🔥 News 
+## 🔥 News
 
 <div style="max-height: 240px; overflow-y: auto;">
 
@@ -92,28 +91,24 @@ Points:
 
 </div>
 
+## 📑 Table of Contents `<span id="table-of-contents">`
 
-## 📑 Table of Contents <span id="table-of-contents"></span>
+* `<a href='#quick-start'>`🚀 Quick Start`</a>`
+  * `<a href='#installation'>`Installation`</a>`
+  * `<a href='#data'>`Data Preparation`</a>`
+  * `<a href='#Training'>`Training`</a>`
+    * `<a href='#Qwen2-VL'>`Qwen2-VL`</a>`
+    * `<a href='#Chameleon'>`Chameleon`</a>`
+    * `<a href='#Arguments'>`Training Arguments`</a>`
+  * `<a href='#Inference'>`Inference`</a>`
+* `<a href='#how-it-works'>`✨ How It Works`</a>`
+* `<a href='#community'>`🤝 Community`</a>`
+* `<a href='#acknowledgements'>`🌱 Acknowledgements`</a>`
+* `<a href='#citation'>`📚 Citation`</a>`
 
+## 🚀 Quick Start `<span id="quick-start">`
 
-* <a href='#quick-start'>🚀 Quick Start</a>
-  * <a href='#installation'>Installation</a>
-  * <a href='#data'>Data Preparation</a>
-  * <a href='#Training'>Training</a>
-    * <a href='#Qwen2-VL'>Qwen2-VL</a>
-    * <a href='#Chameleon'>Chameleon</a>
-    * <a href='#Arguments'>Training Arguments</a>
-  * <a href='#Inference'>Inference</a>
-* <a href='#how-it-works'>✨ How It Works</a>
-* <a href='#community'>🤝 Community</a>
-* <a href='#acknowledgements'>🌱 Acknowledgements</a>
-* <a href='#citation'>📚 Citation</a>
-
-
-## 🚀 Quick Start <span id="quick-start"></span>
-
-
-### 1. Installation <span id="installation"></span>
+### 1. Installation `<span id="installation">`
 
 Clone repo:
 
@@ -144,7 +139,7 @@ IVT-LR/
   └── environment.yml
 ```
 
-### 2. Data Preparation <span id="data"></span>
+### 2. Data Preparation `<span id="data">`
 
 Download datasets:
 
@@ -154,14 +149,13 @@ dataset = load_dataset("derek-thomas/ScienceQA")
 ```
 
 or download manually from:
+
 * {dataset_source_1}
 * {dataset_source_2}
 
+### 3. Training `<span id="Training">`
 
-
-### 3. Training <span id="Training"></span>
-
-#### Qwen2-VL on M3CoT <span id="Qwen2-VL"></span>
+#### Qwen2-VL on M3CoT `<span id="Qwen2-VL">`
 
 To train the Qwen2-VL model with IVT-LR on the M3CoT dataset:
 
@@ -172,9 +166,7 @@ export NCCL_P2P_LEVEL=NVL   # if needed
 PYTHONUNBUFFERED=1 nohup deepspeed --master_port 29501 qwenvl_run.py args/qwen.yaml --deepspeed --deepspeed_config ds_config.json > qwenvl.log 2>&1 &
 ```
 
-
-
-#### Chameleon on ScienceQA <span id="Chameleon"></span>
+#### Chameleon on ScienceQA `<span id="Chameleon">`
 
 For Chameleon:
 
@@ -185,8 +177,7 @@ export NCCL_P2P_LEVEL=NVL   # if needed
 PYTHONUNBUFFERED=1 nohup deepspeed --master_port 29501 chameleon_run_sqa.py args/chameleon.yaml --deepspeed --deepspeed_config ds_config.json > chameleon.log 2>&1 &
 ```
 
-
-#### Training Arguments <span id="Arguments"></span>
+#### Training Arguments `<span id="Arguments">`
 
 Key parameters in configuration:
 
@@ -200,7 +191,7 @@ Key parameters in configuration:
 - `num_epochs`: Total training epochs (default: 16)
 - `lr`: Learning rate (default: 4e-5)
 
-### 4. Inference <span id="Inference"></span>
+### 4. Inference `<span id="Inference">`
 
 To generate the answer on the test split, run the inference code.
 
@@ -208,26 +199,26 @@ Qwen2-VL:
 
 ```
 export CUDA_VISIBLE_DEVICES=0
-nohup python infer.py > infer.log 2>&1 &    
+nohup python infer.py > infer.log 2>&1 &  
 ```
 
 Chameleon:
 
 ```
 export CUDA_VISIBLE_DEVICES=0
-nohup python infer_chameleon_scienceqa.py > infer.log 2>&1 &    
+nohup python infer_chameleon_scienceqa.py > infer.log 2>&1 &  
 ```
 
-## ✨ How It Works <span id="how-it-works"></span>
+## ✨ How It Works `<span id="how-it-works">`
 
-🪐 **Project Name** is built around a modular research pipeline for **{core capability}**, where each component corresponds to a well-defined stage in the overall method.  
-The system separates representation, reasoning, and output stages into independent modules, allowing controlled experimentation and analysis.  
+🪐 **Project Name** is built around a modular research pipeline for **{core capability}**, where each component corresponds to a well-defined stage in the overall method.
+The system separates representation, reasoning, and output stages into independent modules, allowing controlled experimentation and analysis.
 This design enables flexible replacement of individual components without affecting the rest of the pipeline.
 
 At a high level, the workflow proceeds as follows:
 
-1. **{Step 1: Input processing}** — {Describe how raw inputs are converted into model-friendly representations.}  
-2. **{Step 2: Core algorithm or modeling stage}** — {Explain how the main computation or retrieval happens.}  
+1. **{Step 1: Input processing}** — {Describe how raw inputs are converted into model-friendly representations.}
+2. **{Step 2: Core algorithm or modeling stage}** — {Explain how the main computation or retrieval happens.}
 3. **{Step 3: Final output generation}** — {Describe how results are composed, ranked, or produced.}
 
 <div align="center">
@@ -237,7 +228,6 @@ At a high level, the workflow proceeds as follows:
     <figcaption><em>Method overview of {Project Name}.</em></figcaption>
   </figure>
 </div>
-
 
 <!--
 Community
@@ -254,21 +244,19 @@ OPTIONAL:
 
 -->
 
-## 🤝 Join the Community <span id="community"></span>
+## 🤝 Join the Community `<span id="community">`
 
 <div align="center">
 
-
 <!-- Star history chart -->
+
 [![Star History Chart](https://api.star-history.com/svg?repos=xxx/xxx&type=Date)](https://star-history.com/xxx/xxx&Date)
 
 </div>
 
-
 ### 🔗 Related Projects
 
 > **Note**: Please prioritize our own related papers. If additional projects are needed, refer to previous papers by group members to check whether they are directly relevant or comparable.
-
 
 <div align="center">
 
@@ -291,17 +279,16 @@ OPTIONAL:
 
 </div>
 
+## 📚 **Citation** `<span id="citation">`
 
-## 📚 **Citation** <span id="citation"></span>
-
-If you use **{Project Name}** in your research or applications, please consider citing:
+If you use **IVT-LR** in your research or applications, please consider citing:
 
 ```bibtex
-@article{yourproject2025,
-  title        = {{Project Name}: {Short descriptive subtitle}},
-  author       = {Your Name and Collaborator Name and Others},
-  journal      = {arXiv preprint arXiv:{xxxx.xxxxx}},
-  year         = {2025}
+@article{chen2025reasoning,
+  title={Reasoning in the dark: Interleaved vision-text reasoning in latent space},
+  author={Chen, Chao and Ma, Zhixin and Li, Yongqi and Hu, Yupeng and Wei, Yinwei and Li, Wenjie and Nie, Liqiang},
+  journal={arXiv preprint arXiv:2510.12603},
+  year={2025}
 }
 ```
 
