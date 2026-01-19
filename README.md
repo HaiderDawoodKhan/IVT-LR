@@ -27,29 +27,6 @@
 
 </div>
 
-<!--
-Overview
-
-Points:
-
-1. A short paragraph (2–4 sentences) describing:
-    - What the project is.
-    - The main purpose or capability.
-    - What benefit users get.
-    - The scope or application scenario.
-    - The primary components included in this repository.
-
-2. A "Key Features" section.  
-   Each feature should include:
-    - A short title (e.g., "Modular Design", "Fast Training").
-    - A 1–2 sentence explanation of what the feature provides and why it matters.
-   
-3. Add more sections if needed.
-
-4. A main figure image placed under assets/, e.g., assets/overview.png.  
-   This image should visually summarize the system or framework.
-
--->
 
 Interleaved Vision-Text Latent Reasoning (IVT-LR) is the first VLM framework that unifies textual and visual representations in the latent space and implements multimodal latent reasoning. Specifically, IVT-LR represents each reasoning step by combining two implicit parts: ***latent text*** and ***latent vision***. We further introduce a progressive multi-stage training strategy to enable MLLMs to perform the above multimodal latent reasoning steps.
 
@@ -61,20 +38,6 @@ Interleaved Vision-Text Latent Reasoning (IVT-LR) is the first VLM framework tha
   </figure>
 </div>
 
-<!--
-News 
-
-Points:
-1. Include chronological updates about the project.
-2. Each news entry should have:
-   - A date in [YYYY.MM] or [YYYY, MMM DD] format.
-   - A short highlight sentence.
-3. Optional but encouraged:
-   - Bullet lists for detailed updates.
-   - Links to papers, project pages, demos, datasets.
-   - Emojis to increase readability.
-
--->
 
 ## 🔥 News
 
@@ -108,9 +71,9 @@ Points:
 * [📚 Citation](#citation)
 
 
-## 🚀 Quick Start `<span id="quick-start">`
+* [🚀 Quick Start](#quick-start)
+  * [1. Installation](#1-installation)
 
-### 1. Installation `<span id="installation">`
 
 Clone repo:
 
