@@ -91,20 +91,22 @@ Points:
 
 </div>
 
-## 📑 Table of Contents `<span id="table-of-contents">`
 
-* `<a href='#quick-start'>`🚀 Quick Start`</a>`
-  * `<a href='#installation'>`Installation`</a>`
-  * `<a href='#data'>`Data Preparation`</a>`
-  * `<a href='#Training'>`Training`</a>`
-    * `<a href='#Qwen2-VL'>`Qwen2-VL`</a>`
-    * `<a href='#Chameleon'>`Chameleon`</a>`
-    * `<a href='#Arguments'>`Training Arguments`</a>`
-  * `<a href='#Inference'>`Inference`</a>`
-* `<a href='#how-it-works'>`✨ How It Works`</a>`
-* `<a href='#community'>`🤝 Community`</a>`
-* `<a href='#acknowledgements'>`🌱 Acknowledgements`</a>`
-* `<a href='#citation'>`📚 Citation`</a>`
+## 📑 Table of Contents <span id="table-of-contents"></span>
+
+* [🚀 Quick Start](#quick-start)
+  * [Installation](#installation)
+  * [Data Preparation](#data)
+  * [Training](#training)
+    * [Qwen2-VL](#qwen2-vl)
+    * [Chameleon](#chameleon)
+    * [Training Arguments](#arguments)
+  * [Inference](#inference)
+* [✨ How It Works](#how-it-works)
+* [🤝 Community](#community)
+* [🌱 Acknowledgements](#acknowledgements)
+* [📚 Citation](#citation)
+
 
 ## 🚀 Quick Start `<span id="quick-start">`
 
