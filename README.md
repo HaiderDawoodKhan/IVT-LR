@@ -114,8 +114,8 @@ dataset = load_dataset("derek-thomas/ScienceQA")
 
 or download manually from:
 
-* {dataset_source_1}
-* {dataset_source_2}
+* [M3CoT](https://huggingface.co/datasets/LightChen2333/M3CoT)
+* [ScienceQA](https://huggingface.co/datasets/derek-thomas/ScienceQA)
 
 ### 3. Training <span id="training"></span>
 
