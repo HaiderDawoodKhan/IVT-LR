@@ -175,23 +175,15 @@ nohup python infer_chameleon_scienceqa.py > infer.log 2>&1 &
 
 ## ✨ How It Works <span id="how-it-works"></span>
 
-🪐 **Project Name** is built around a modular research pipeline for **{core capability}**, where each component corresponds to a well-defined stage in the overall method.
-The system separates representation, reasoning, and output stages into independent modules, allowing controlled experimentation and analysis.
-This design enables flexible replacement of individual components without affecting the rest of the pipeline.
+**IVT-LR** introduces a novel paradigm of multimodal latent reasoning that unifies textual and visual representations within the latent space. Unlike explicit chain-of-thought methods that require labor-intensive vision-text annotations, IVT-LR performs reasoning implicitly, achieving both annotation efficiency and inference speedup.
 
 At a high level, the workflow proceeds as follows:
 
-1. **{Step 1: Input processing}** — {Describe how raw inputs are converted into model-friendly representations.}
-2. **{Step 2: Core algorithm or modeling stage}** — {Explain how the main computation or retrieval happens.}
-3. **{Step 3: Final output generation}** — {Describe how results are composed, ranked, or produced.}
+1. **Interleaved Multimodal Representation** — Each reasoning step combines two implicit components: ***latent text*** and ***latent vision***. This interleaved structure enables the model to jointly leverage both modalities during reasoning.
 
-<div align="center">
-  <figure>
-    <img src="./assets/{method-figure.png}" alt="Method Overview" style="max-width: 100%; height: auto;">
-    <br>
-    <figcaption><em>Method overview of {Project Name}.</em></figcaption>
-  </figure>
-</div>
+2. **Progressive Multi-Stage Training** — We employ a curriculum-style training strategy that gradually increases the number of latent reasoning stages. This progressive approach helps MLLMs learn to perform multimodal latent reasoning in a stable and effective manner.
+
+3. **Dynamic Attention Allocation** — A key insight from our analysis is that interleaved multimodal reasoning leads to dynamic attention redistribution. As reasoning progresses, the model adaptively shifts attention between visual and textual tokens based on task demands, significantly enhancing visual perception capabilities.
 
 <!--
 Community
