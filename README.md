@@ -45,11 +45,6 @@ Interleaved Vision-Text Latent Reasoning (IVT-LR) is the first VLM framework tha
 
 - **[2025.10]** Model files are now available on [Hugging Face](https://huggingface.co/FYYDCC/IVTLR) !
 
-<!-- - **[2025.xx]** 🎉🎉 We released a major upgrade including new benchmarks, UI, and documentation.
-  - 📄 Paper: <a href="{paper_link}">arXiv</a>
-  - 📊 Benchmark Suite: <a href="{benchmark_link}">Link</a>
-  - 🖥️ Web UI: {description} -->
-
 - **[2025.10]** 🎉🎉Initial release of the project.
 
 </div>
@@ -67,6 +62,7 @@ Interleaved Vision-Text Latent Reasoning (IVT-LR) is the first VLM framework tha
   * [Inference](#inference)
 * [✨ How It Works](#how-it-works)
 * [🤝 Community](#community)
+* [🔗 Related Projects](#related)
 * [📚 Citation](#citation)
 
 
@@ -77,7 +73,7 @@ Interleaved Vision-Text Latent Reasoning (IVT-LR) is the first VLM framework tha
 Clone repo:
 
 ```
-git clone https://github.com/FYYDCC/IVT-LR.git
+git clone https://github.com/ModalityDance/IVT-LR.git
 cd IVT-LR
 ```
 
@@ -185,20 +181,6 @@ At a high level, the workflow proceeds as follows:
 
 3. **Dynamic Attention Allocation** — A key insight from our analysis is that interleaved multimodal reasoning leads to dynamic attention redistribution. As reasoning progresses, the model adaptively shifts attention between visual and textual tokens based on task demands, significantly enhancing visual perception capabilities.
 
-<!--
-Community
-
-REQUIRED:
-1. Contributors section or GitHub contributors graph.
-2. Star history chart.
-3. A short paragraph encouraging engagement with the project.
-
-OPTIONAL:
-1. Social groups (Slack, Discord, WeChat, Feishu).
-2. Issue tracker link (GitHub Issues).
-3. Contribution guidelines (link to CONTRIBUTING.md if exists).
-
--->
 
 ## 🤝 Join the Community <span id="community"></span>
 
@@ -210,30 +192,21 @@ OPTIONAL:
 
 </div>
 
-### 🔗 Related Projects
+## 🔗 **Related Projects** <span id="related"></span>
 
-> **Note**: Please prioritize our own related papers. If additional projects are needed, refer to previous papers by group members to check whether they are directly relevant or comparable.
+### 📄 Related Papers
 
-<div align="center">
+- **[Coconut: Training Large Language Models to Reason in a Continuous Latent Space](https://arxiv.org/abs/2412.06769)**  
+  A pioneering work on latent reasoning that uses continuous thought representations for LLM reasoning.
 
-<table>
-<tr>
-<td align="center">
-  <b>🌟 Related Project 1</b><br/>
-  <a href="{project_link_1}">{project_link_1}</a>
-</td>
-<td align="center">
-  <b>🚀 Related Project 2</b><br/>
-  <a href="{project_link_2}">{project_link_2}</a>
-</td>
-<td align="center">
-  <b>🔧 Related Project 3</b><br/>
-  <a href="{project_link_3}">{project_link_3}</a>
-</td>
-</tr>
-</table>
+### 🌟 Awesome Collections
 
-</div>
+- **[Awesome Latent Space](https://github.com/YU-deep/Awesome-Latent-Space)**  
+  A curated collection of resources on latent space methods and applications.
+
+- **[Awesome Latent CoT](https://github.com/EIT-NLP/Awesome-Latent-CoT)**  
+  A comprehensive list of latent chain-of-thought reasoning resources.
+
 
 ## 📚 **Citation** <span id="citation"></span>
 
@@ -248,7 +221,6 @@ If you use **IVT-LR** in your research or applications, please consider citing:
 }
 ```
 
-<!-- Modify the repository URL accordingly. -->
 
 <div align="center">
 
@@ -260,10 +232,7 @@ If you use **IVT-LR** in your research or applications, please consider citing:
   <img src="https://img.shields.io/badge/🐞 Report%20Issues-e74c3c?style=for-the-badge&logo=github" />
 </a>
 
-<a href="https://github.com/ModalityDance/IVT-LR/discussions">
-  <img src="https://img.shields.io/badge/💬 Discussions-20c997?style=for-the-badge&logo=github" />
-</a>
 <br/>
-⭐ <b>Thank you for visiting {Project Name}!</b> ⭐
+⭐ <b>Thank you for visiting IVT-LR!</b> ⭐
 
 </div>
