@@ -40,7 +40,7 @@ Interleaved Vision-Text Latent Reasoning (IVT-LR) is the first VLM framework tha
 
 <div style="max-height: 240px; overflow-y: auto;">
 
-- **[2025.10]** Model files are now available on [Hugging Face](https://huggingface.co/FYYDCC/IVTLR) !
+- **[2025.10]** Model files are now available on [Hugging Face](https://huggingface.co/ModalityDance/IVTLR) !
 
 - **[2025.10]** 🎉🎉Initial release of the project.
 
