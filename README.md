@@ -131,7 +131,7 @@ export NCCL_P2P_LEVEL=NVL   # if needed
 PYTHONUNBUFFERED=1 nohup deepspeed --master_port 29501 qwenvl_run_sqa.py args/qwen.yaml --deepspeed --deepspeed_config ds_config.json > qwenvl.log 2>&1 &
 ```
 
-#### Chameleon on ScienceQA <span id="chameleon"></span>
+#### Chameleon <span id="chameleon"></span>
 
 For Chameleon on M3CoT:
 
