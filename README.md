@@ -111,7 +111,7 @@ or download manually from:
 
 ### 3. Training <span id="training"></span>
 
-#### Qwen2-VL on M3CoT <span id="qwen2-vl"></span>
+#### Qwen2-VL <span id="qwen2-vl"></span>
 
 To train the Qwen2-VL model with IVT-LR on the M3CoT dataset:
 
@@ -122,9 +122,27 @@ export NCCL_P2P_LEVEL=NVL   # if needed
 PYTHONUNBUFFERED=1 nohup deepspeed --master_port 29501 qwenvl_run.py args/qwen.yaml --deepspeed --deepspeed_config ds_config.json > qwenvl.log 2>&1 &
 ```
 
+To train the Qwen2-VL model with IVT-LR on the ScienceQA dataset:
+
+```
+cd qwen_vl
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+export NCCL_P2P_LEVEL=NVL   # if needed
+PYTHONUNBUFFERED=1 nohup deepspeed --master_port 29501 qwenvl_run_sqa.py args/qwen.yaml --deepspeed --deepspeed_config ds_config.json > qwenvl.log 2>&1 &
+```
+
 #### Chameleon on ScienceQA <span id="chameleon"></span>
 
-For Chameleon:
+For Chameleon on M3CoT:
+
+```
+cd chameleon
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+export NCCL_P2P_LEVEL=NVL   # if needed
+PYTHONUNBUFFERED=1 nohup deepspeed --master_port 29501 chameleon_run.py args/chameleon.yaml --deepspeed --deepspeed_config ds_config.json > chameleon.log 2>&1 &
+```
+
+For Chameleon on ScienceQA:
 
 ```
 cd chameleon
