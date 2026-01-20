@@ -14,7 +14,7 @@
 
 <!-- HuggingFace Models -->
 
-<a href="https://huggingface.co/ModalityDance/IVTLR">
+<a href="https://huggingface.co/ModalityDance/IVT-LR">
     <img src="https://img.shields.io/badge/HuggingFace-Models-fcc21b?style=for-the-badge&logo=huggingface&logoColor=white" alt="HF Models">
   </a>
 
