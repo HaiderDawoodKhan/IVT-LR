@@ -1,7 +1,6 @@
 <a name="readme-top"></a>
 
 <div align="center">
-  <img src="./assets/LOGO.png" alt="Project Logo" width="300">
   <h1 align="center">Reasoning in the Dark: Interleaved Vision-Text Reasoning in Latent Space</h1>
 </div>
 
