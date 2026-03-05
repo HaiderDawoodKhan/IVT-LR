@@ -1,6 +1,7 @@
 project: ivtlr
 save_path: /path/IVT-LR/qwen_vl/
 name: qwen_IVTLR
+model_id: Qwen/Qwen2-VL-2B-Instruct
 
 epochs_per_stage: 4
 max_latent_stage: 5
@@ -15,3 +16,13 @@ debug: False
 gradient_accumulation_steps: 8
 num_epochs: 16
 lr: !!float "4e-5"
+
+# training
+# cd qwen_vl
+# export CUDA_VISIBLE_DEVICES=0
+# PYTHONUNBUFFERED=1 nohup deepspeed qwenvl_run.py args/qwen.yaml --deepspeed --deepspeed_config ds_config.json > qwenvl.log 2>&1 &
+
+# inference
+# cd qwen_vl
+# export CUDA_VISIBLE_DEVICES=0
+# nohup python infer_base.py --model_id Qwen/Qwen2-VL-2B-Instruct > infer_base.log 2>&1 &

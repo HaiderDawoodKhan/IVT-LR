@@ -1,0 +1,20 @@
+{
+  "train_batch_size": 16,
+  "train_micro_batch_size_per_gpu": 2,
+  "gradient_accumulation_steps": 8,
+  "bf16": {
+    "enabled": true
+  },
+  "zero_optimization": { "stage": 0 },
+
+  "optimizer": {
+    "type": "AdamW",
+    "params": {
+      "lr": 4e-5,
+      "weight_decay": 0.01
+    }
+  },
+  "gradient_clipping": 0.7,
+  "steps_per_print": 50,
+  "wall_clock_breakdown": false
+}

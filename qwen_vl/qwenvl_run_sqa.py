@@ -83,6 +83,8 @@ def main():
         config_dict = yaml.safe_load(f)
 
     configs = Config(config_dict)
+    model_id = getattr(configs, "model_id", "Qwen/Qwen2-VL-2B-Instruct")
+    print(f"Using model_id: {model_id}")
     set_seed(configs.seed)
     save_dir = os.path.join(configs.save_path, configs.name)
 
@@ -111,17 +113,18 @@ def main():
     print("start loading model")
     # Todo:modify model and Tokenizer
     model = Qwen2VLForConditionalGeneration.from_pretrained(
-        "Qwen/Qwen2-VL-7B-Instruct", device_map="cuda", torch_dtype=torch.bfloat16, trust_remote_code=True, attn_implementation="eager"
+        model_id, device_map="cuda", torch_dtype=torch.bfloat16, trust_remote_code=True, attn_implementation="eager"
     )
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     optimizer = AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=configs.lr)
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", use_fast=False, trust_remote_code=True)
+    tokenizer_processor_model_id = "Qwen/Qwen2.5-VL-7B-Instruct" if model_id == "Qwen/Qwen2-VL-7B-Instruct" else model_id
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_processor_model_id, use_fast=False, trust_remote_code=True)
     tokenizer.padding_side = "right"
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.add_tokens("<|start-latent|>")
     tokenizer.add_tokens("<|end-latent|>")
     tokenizer.add_tokens("<|latent|>")
-    processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", tokenizer=tokenizer)
+    processor = AutoProcessor.from_pretrained(tokenizer_processor_model_id, tokenizer=tokenizer)
     latent_id = tokenizer.convert_tokens_to_ids("<|latent|>")
     print("latent_id: ", latent_id)
     start_id = tokenizer.convert_tokens_to_ids("<|start-latent|>")
@@ -148,7 +151,7 @@ def main():
     
     model.print_trainable_parameters()
 
-    model = IVTLR(model, latent_id, start_id, end_id, tokenizer.eos_token_id, image_token_id, visual_start_id, visual_end_id)
+    model = IVTLR(model, latent_id, start_id, end_id, tokenizer.eos_token_id, image_token_id, visual_start_id, visual_end_id, model_id=model_id)
 
     print(f"Running Deepspeed on rank = {rank}, world size = {world_size}")
     model = model.to(rank)
@@ -209,8 +212,14 @@ def main():
             choices = example["choices"]
 
             choices_str = "[Options]:\n"+"\n".join([
+                f"({chr(65 + i)}).{{{choice.strip()}}}"
                 for i, choice in enumerate(choices)
             ])
+            # choices_str = "[Options]:\n"+"\n".join([
+            #     for i, choice in enumerate(choices)
+            # ])
+
+            
         else:
             choices_str = ""
         

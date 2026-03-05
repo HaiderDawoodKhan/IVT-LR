@@ -12,6 +12,7 @@ import json
 import os
 import time
 from datetime import timedelta
+import argparse
 logging.basicConfig(
     filename='qwenvl_32_infer_time.log',
     level=logging.DEBUG,
@@ -22,10 +23,18 @@ import pdb
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def load_inference_model(checkpoint_path):
-    processor = AutoProcessor.from_pretrained("Qwen/Qwen2-VL-7B-Instruct")
+def parse_args():
+    parser = argparse.ArgumentParser(description="Qwen-VL inference")
+    parser.add_argument("--checkpoint_path", type=str, default="your_path", help="Path to trained checkpoint")
+    parser.add_argument("--model_id", type=str, default="Qwen/Qwen2-VL-2B-Instruct", help="HF model id")
+    return parser.parse_args()
+
+
+def load_inference_model(checkpoint_path, model_id):
+    print(f"Using model_id: {model_id}")
+    processor = AutoProcessor.from_pretrained(model_id)
     tokenizer = AutoTokenizer.from_pretrained(
-        "Qwen/Qwen2-VL-7B-Instruct",
+        model_id,
         use_fast=False,
         trust_remote_code=True,
         padding_side="right"
@@ -40,7 +49,7 @@ def load_inference_model(checkpoint_path):
     })
     
     base_model = Qwen2VLForConditionalGeneration.from_pretrained(
-        "Qwen/Qwen2-VL-7B-Instruct",
+        model_id,
         device_map="cuda",
         torch_dtype=torch.bfloat16,
         trust_remote_code=True,
@@ -75,7 +84,8 @@ def load_inference_model(checkpoint_path):
         eos_token_id=tokenizer.eos_token_id,
         image_token_id=image_token_id,
         visual_start_id=visual_start_id, 
-        visual_end_id=visual_end_id
+        visual_end_id=visual_end_id,
+        model_id=model_id
     )
     
     state_dict = torch.load(checkpoint_path, map_location="cpu")
@@ -91,7 +101,8 @@ def load_inference_model(checkpoint_path):
     model.eval()
     return model, processor, tokenizer
 
-model, processor, tokenizer = load_inference_model("your_path")
+args = parse_args()
+model, processor, tokenizer = load_inference_model(args.checkpoint_path, args.model_id)
 
 os.makedirs("output", exist_ok=True)
 

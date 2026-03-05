@@ -31,6 +31,7 @@ class IVTLR(nn.Module):
         visual_start_id,
         visual_end_id,
         num_selected_patches: int = 32,
+        model_id: str = "Qwen/Qwen2-VL-2B-Instruct",
     ):
 
         super(IVTLR, self).__init__()
@@ -44,6 +45,7 @@ class IVTLR(nn.Module):
         self.visual_start_id = visual_start_id
         self.visual_end_id = visual_end_id
         self.num_selected_patches = num_selected_patches
+        self.model_id = model_id
 
         # tested with GPT2 and Llama3
         if isinstance(self.base_causallm, GPT2LMHeadModel):
@@ -52,7 +54,7 @@ class IVTLR(nn.Module):
             self.embedding = self.base_causallm.get_input_embeddings()
         
         # self.processor = ChameleonProcessor.from_pretrained("facebook/chameleon-7b")
-        self.processor = AutoProcessor.from_pretrained("Qwen/Qwen2-VL-7B-Instruct")
+        self.processor = AutoProcessor.from_pretrained(self.model_id)
     def forward(
         self,
         input_ids: torch.LongTensor,        # shape = (B, S)
