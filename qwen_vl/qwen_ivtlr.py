@@ -31,6 +31,7 @@ class IVTLR(nn.Module):
         visual_start_id,
         visual_end_id,
         num_selected_patches: int = 32,
+        mask_selected_patches: bool = True,
         model_id: str = "Qwen/Qwen2-VL-2B-Instruct",
     ):
 
@@ -45,6 +46,7 @@ class IVTLR(nn.Module):
         self.visual_start_id = visual_start_id
         self.visual_end_id = visual_end_id
         self.num_selected_patches = num_selected_patches
+        self.mask_selected_patches = mask_selected_patches
         self.model_id = model_id
         self.last_topk_trace = []
 
@@ -194,13 +196,15 @@ class IVTLR(nn.Module):
                     abs_idxs = (vs + 1) + topk_rel
                     logging.debug(f"topk_rel: {topk_rel}")
                     logging.debug(f"abs idx: {abs_idxs}")
-                    image_mask[b, abs_idxs] = False
+                    if self.mask_selected_patches:
+                        image_mask[b, abs_idxs] = False
 
                     picked = inputs_embeds[b, abs_idxs, :]  # (K, D)
                     select_image_embeds.append(picked)
                     self.last_topk_trace[b]["steps"].append(
                         {
                             "pass_idx": pass_idx,
+                            "mask_selected_patches": self.mask_selected_patches,
                             "topk_rel": topk_rel.detach().cpu().tolist(),
                             "abs_idxs": abs_idxs.detach().cpu().tolist(),
                             "embeddings": picked.detach().to(torch.float16).cpu(),

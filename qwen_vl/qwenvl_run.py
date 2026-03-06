@@ -150,7 +150,18 @@ def main():
     
     model.print_trainable_parameters()
 
-    model = IVTLR(model, latent_id, start_id, end_id, tokenizer.eos_token_id, image_token_id, visual_start_id, visual_end_id, model_id=model_id)
+    model = IVTLR(
+        model,
+        latent_id,
+        start_id,
+        end_id,
+        tokenizer.eos_token_id,
+        image_token_id,
+        visual_start_id,
+        visual_end_id,
+        mask_selected_patches=getattr(configs, "mask_selected_patches", True),
+        model_id=model_id,
+    )
 
     print(f"Running Deepspeed on rank = {rank}, world size = {world_size}")
     model = model.to(rank)

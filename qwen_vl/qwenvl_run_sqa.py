@@ -151,7 +151,18 @@ def main():
     
     model.print_trainable_parameters()
 
-    model = IVTLR(model, latent_id, start_id, end_id, tokenizer.eos_token_id, image_token_id, visual_start_id, visual_end_id, model_id=model_id)
+    model = IVTLR(
+        model,
+        latent_id,
+        start_id,
+        end_id,
+        tokenizer.eos_token_id,
+        image_token_id,
+        visual_start_id,
+        visual_end_id,
+        mask_selected_patches=getattr(configs, "mask_selected_patches", True),
+        model_id=model_id,
+    )
 
     print(f"Running Deepspeed on rank = {rank}, world size = {world_size}")
     model = model.to(rank)
@@ -271,11 +282,6 @@ def main():
 
     train_dataset = dataset["train"].filter(has_image)
     train_dataset = train_dataset.map(process_example, num_proc=32)
-
-
-    base_dataset_valid = get_dataset(
-        val_dataset, tokenizer, processor, max_size=32 if configs.debug else 100000000
-    )
 
     base_dataset_train = get_dataset(
         train_dataset, tokenizer, processor, max_size=5000 if configs.debug else 100000000

@@ -24,6 +24,17 @@ import pdb
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    value = value.lower()
+    if value in {"true", "1", "yes", "y", "on"}:
+        return True
+    if value in {"false", "0", "no", "n", "off"}:
+        return False
+    raise argparse.ArgumentTypeError(f"Invalid boolean value: {value}")
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Qwen-VL ScienceQA inference")
     parser.add_argument("--checkpoint_path", type=str, default="your_path", help="Path to trained checkpoint")
@@ -34,10 +45,12 @@ def parse_args():
     parser.add_argument("--max_samples", type=int, default=-1, help="Optional sample cap for debugging")
     parser.add_argument("--output_dir", type=str, default="output", help="Directory for comparison artifacts")
     parser.add_argument("--output_prefix", type=str, default="scienceqa_compare", help="Prefix for comparison artifacts")
+    parser.add_argument("--mask_selected_patches", type=str2bool, default=True, help="Whether selected top-k image patches are masked to prevent reselection")
+    parser.add_argument("--run_ablations", type=str2bool, default=True, help="Whether to run cumulative and non-cumulative ablations")
     return parser.parse_args()
 
 
-def load_inference_model(checkpoint_path, model_id, top_k):
+def load_inference_model(checkpoint_path, model_id, top_k, mask_selected_patches):
     print(f"Using model_id: {model_id}")
     processor = AutoProcessor.from_pretrained(model_id)
     tokenizer = AutoTokenizer.from_pretrained(
@@ -93,6 +106,7 @@ def load_inference_model(checkpoint_path, model_id, top_k):
         visual_start_id=visual_start_id, 
         visual_end_id=visual_end_id,
         num_selected_patches=top_k,
+        mask_selected_patches=mask_selected_patches,
         model_id=model_id
     )
     
@@ -110,7 +124,7 @@ def load_inference_model(checkpoint_path, model_id, top_k):
     return model, processor, tokenizer
 
 args = parse_args()
-model, processor, tokenizer = load_inference_model(args.checkpoint_path, args.model_id, args.top_k)
+model, processor, tokenizer = load_inference_model(args.checkpoint_path, args.model_id, args.top_k, args.mask_selected_patches)
 
 os.makedirs("output", exist_ok=True)
 
@@ -166,6 +180,8 @@ def evaluate_and_save(eval_dataset, model, processor, args):
     embed_results = {}
     step_correct = {}
     step_total = {}
+    step_single_correct = {}
+    step_single_total = {}
     sample_rows = []
 
     total_generated_tokens = 0
@@ -264,23 +280,43 @@ def evaluate_and_save(eval_dataset, model, processor, args):
 
         step_preds = {}
         step_correctness = {}
-        for step_n in range(1, len(embedding_steps) + 1):
-            with torch.no_grad():
-                step_outputs = model.generate_with_selected_embeddings(
-                    input_ids=inputs["input_ids"],
-                    selected_step_embeddings=embedding_steps,
-                    attention_mask=inputs["attention_mask"],
-                    max_new_tokens=args.max_new_tokens,
-                    num_steps=step_n,
-                )
-            step_tokens = step_outputs[0, prompt_length:]
-            step_text = processor.decode(step_tokens, skip_special_tokens=True)
-            step_pred = extract_answer(step_text)
-            step_ok = step_pred == gt_answer
-            step_preds[str(step_n)] = step_pred
-            step_correctness[str(step_n)] = step_ok
-            step_correct[step_n] = step_correct.get(step_n, 0) + (1 if step_ok else 0)
-            step_total[step_n] = step_total.get(step_n, 0) + 1
+        step_single_preds = {}
+        step_single_correctness = {}
+        if args.run_ablations:
+            for step_n in range(1, len(embedding_steps) + 1):
+                with torch.no_grad():
+                    step_outputs = model.generate_with_selected_embeddings(
+                        input_ids=inputs["input_ids"],
+                        selected_step_embeddings=embedding_steps,
+                        attention_mask=inputs["attention_mask"],
+                        max_new_tokens=args.max_new_tokens,
+                        num_steps=step_n,
+                    )
+                step_tokens = step_outputs[0, prompt_length:]
+                step_text = processor.decode(step_tokens, skip_special_tokens=True)
+                step_pred = extract_answer(step_text)
+                step_ok = step_pred == gt_answer
+                step_preds[str(step_n)] = step_pred
+                step_correctness[str(step_n)] = step_ok
+                step_correct[step_n] = step_correct.get(step_n, 0) + (1 if step_ok else 0)
+                step_total[step_n] = step_total.get(step_n, 0) + 1
+
+                with torch.no_grad():
+                    step_single_outputs = model.generate_with_selected_embeddings(
+                        input_ids=inputs["input_ids"],
+                        selected_step_embeddings=[embedding_steps[step_n - 1]],
+                        attention_mask=inputs["attention_mask"],
+                        max_new_tokens=args.max_new_tokens,
+                        num_steps=1,
+                    )
+                step_single_tokens = step_single_outputs[0, prompt_length:]
+                step_single_text = processor.decode(step_single_tokens, skip_special_tokens=True)
+                step_single_pred = extract_answer(step_single_text)
+                step_single_ok = step_single_pred == gt_answer
+                step_single_preds[str(step_n)] = step_single_pred
+                step_single_correctness[str(step_n)] = step_single_ok
+                step_single_correct[step_n] = step_single_correct.get(step_n, 0) + (1 if step_single_ok else 0)
+                step_single_total[step_n] = step_single_total.get(step_n, 0) + 1
 
         sample_rows.append(
             {
@@ -291,8 +327,10 @@ def evaluate_and_save(eval_dataset, model, processor, args):
                 "full_image_correct": full_ok,
                 "embedding_only_correct": embed_ok,
                 "num_steps_captured": len(embedding_steps),
-                "step_predictions": step_preds,
-                "step_correctness": step_correctness,
+                "step_predictions_cumulative": step_preds,
+                "step_correctness_cumulative": step_correctness,
+                "step_predictions_non_cumulative": step_single_preds,
+                "step_correctness_non_cumulative": step_single_correctness,
                 "embedding_file": os.path.join(embeddings_dir, f"{idx}.pt"),
             }
         )
@@ -310,7 +348,11 @@ def evaluate_and_save(eval_dataset, model, processor, args):
     step_acc = {
         str(step_n): accuracy(step_correct.get(step_n, 0), step_total.get(step_n, 0))
         for step_n in sorted(step_total.keys())
-    }
+    } if args.run_ablations else {}
+    step_single_acc = {
+        str(step_n): accuracy(step_single_correct.get(step_n, 0), step_single_total.get(step_n, 0))
+        for step_n in sorted(step_single_total.keys())
+    } if args.run_ablations else {}
     summary = {
         "dataset": "ScienceQA",
         "total": total,
@@ -319,7 +361,10 @@ def evaluate_and_save(eval_dataset, model, processor, args):
         "full_image_accuracy": full_acc,
         "embedding_only_accuracy": embed_acc,
         "accuracy_delta": embed_acc - full_acc,
+        "mask_selected_patches": args.mask_selected_patches,
+        "run_ablations": args.run_ablations,
         "step_ablation_accuracy": step_acc,
+        "step_ablation_accuracy_non_cumulative": step_single_acc,
     }
 
     write_json(os.path.join(args.output_dir, f"{args.output_prefix}_summary.json"), summary)
