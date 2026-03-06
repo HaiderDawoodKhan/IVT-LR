@@ -46,6 +46,7 @@ class IVTLR(nn.Module):
         self.visual_end_id = visual_end_id
         self.num_selected_patches = num_selected_patches
         self.model_id = model_id
+        self.last_topk_trace = []
 
         # tested with GPT2 and Llama3
         if isinstance(self.base_causallm, GPT2LMHeadModel):
@@ -55,6 +56,13 @@ class IVTLR(nn.Module):
         
         # self.processor = ChameleonProcessor.from_pretrained("facebook/chameleon-7b")
         self.processor = AutoProcessor.from_pretrained(self.model_id)
+
+    def clear_topk_trace(self):
+        self.last_topk_trace = []
+
+    def get_topk_trace(self):
+        return self.last_topk_trace
+
     def forward(
         self,
         input_ids: torch.LongTensor,        # shape = (B, S)
@@ -67,6 +75,17 @@ class IVTLR(nn.Module):
     ):
 
         B, S = input_ids.size()
+        sample_keys = kwargs.get("sample_keys", None)
+        if sample_keys is None:
+            sample_keys = [None for _ in range(B)]
+        self.last_topk_trace = [
+            {
+                "batch_index": b,
+                "sample_key": sample_keys[b],
+                "steps": [],
+            }
+            for b in range(B)
+        ]
 
         # decode
         _ = self.processor.tokenizer.batch_decode(
@@ -179,6 +198,14 @@ class IVTLR(nn.Module):
 
                     picked = inputs_embeds[b, abs_idxs, :]  # (K, D)
                     select_image_embeds.append(picked)
+                    self.last_topk_trace[b]["steps"].append(
+                        {
+                            "pass_idx": pass_idx,
+                            "topk_rel": topk_rel.detach().cpu().tolist(),
+                            "abs_idxs": abs_idxs.detach().cpu().tolist(),
+                            "embeddings": picked.detach().to(torch.float16).cpu(),
+                        }
+                    )
 
                 select_image_embeds = torch.stack(select_image_embeds, dim=0)  # (B, K, D)
                 inputs_embeds_detached = inputs_embeds.detach().clone()
@@ -380,7 +407,8 @@ class IVTLR(nn.Module):
             labels=current_ids.clone(),  
             position_ids=position_ids,
             pixel_values=pixel_values,
-            image_grid_thw=image_grid_thw
+            image_grid_thw=image_grid_thw,
+            **kwargs
         )
 
 
@@ -456,5 +484,100 @@ class IVTLR(nn.Module):
             return torch.tensor(tokens).view(1, -1), current_inputs_embeds
         else:
             return torch.tensor(tokens).view(1, -1)
+
+    def generate_with_selected_embeddings(
+        self,
+        input_ids,
+        selected_step_embeddings,
+        attention_mask=None,
+        max_new_tokens=16,
+        num_steps=None,
+    ):
+        assert input_ids.shape[0] == 1, "only support batch_size == 1 now"
+
+        if attention_mask is None:
+            attention_mask = torch.ones_like(input_ids)
+
+        inputs_embeds = self.embedding(input_ids.clone())
+        image_positions = (input_ids[0] == self.image_token_id).nonzero(as_tuple=False).flatten()
+
+        if num_steps is None:
+            num_steps = len(selected_step_embeddings)
+
+        selected_list = []
+        for step in selected_step_embeddings[:num_steps]:
+            if isinstance(step, torch.Tensor):
+                selected_list.append(step)
+            else:
+                selected_list.append(torch.tensor(step))
+
+        if len(selected_list) > 0:
+            flattened = torch.cat(selected_list, dim=0).to(inputs_embeds.device, inputs_embeds.dtype)
+            n_replace = min(image_positions.numel(), flattened.size(0))
+            if n_replace > 0:
+                inputs_embeds[0, image_positions[:n_replace], :] = flattened[:n_replace]
+
+        tokens = input_ids[0].detach().tolist()
+        current_inputs_embeds = inputs_embeds
+        current_attention_mask = attention_mask.to(inputs_embeds.device)
+
+        position_ids = torch.arange(
+            0,
+            current_inputs_embeds.shape[1],
+            dtype=torch.long,
+            device=current_inputs_embeds.device,
+        ).reshape(1, -1)
+
+        outputs = self.base_causallm.forward(
+            inputs_embeds=current_inputs_embeds,
+            attention_mask=current_attention_mask,
+            position_ids=position_ids,
+            pixel_values=None,
+            image_grid_thw=None,
+            use_cache=True,
+        )
+
+        next_token = torch.argmax(outputs.logits[0, -1]).item()
+        tokens.append(next_token)
+        next_token_embedding = self.embedding(
+            torch.tensor([[next_token]], device=current_inputs_embeds.device)
+        )
+        current_inputs_embeds = torch.cat([current_inputs_embeds, next_token_embedding], dim=1)
+        current_attention_mask = torch.cat(
+            [current_attention_mask, torch.ones((1, 1), device=current_inputs_embeds.device)], dim=1
+        )
+
+        past_key_values = outputs.past_key_values
+
+        for _ in range(max_new_tokens - 1):
+            position_ids = torch.tensor(
+                [[current_inputs_embeds.shape[1] - 1]], device=current_inputs_embeds.device
+            )
+            outputs = self.base_causallm.forward(
+                inputs_embeds=next_token_embedding,
+                attention_mask=current_attention_mask,
+                position_ids=position_ids,
+                pixel_values=None,
+                image_grid_thw=None,
+                past_key_values=past_key_values,
+                use_cache=True,
+            )
+            past_key_values = outputs.past_key_values
+
+            next_token = torch.argmax(outputs.logits[0, -1]).item()
+            tokens.append(next_token)
+
+            next_token_embedding = self.embedding(
+                torch.tensor([[next_token]], device=current_inputs_embeds.device)
+            )
+            current_inputs_embeds = torch.cat([current_inputs_embeds, next_token_embedding], dim=1)
+            current_attention_mask = torch.cat(
+                [current_attention_mask, torch.ones((1, 1), device=current_inputs_embeds.device)], dim=1
+            )
+
+            if next_token == self.eos_token_id:
+                break
+
+        return torch.tensor(tokens).view(1, -1)
 
 
