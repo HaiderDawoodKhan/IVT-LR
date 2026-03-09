@@ -14,11 +14,11 @@ OUTPUT_DIR=${OUTPUT_DIR:-"output"}
 MAX_SAMPLES=${MAX_SAMPLES:--1}
 RUN_ABLATIONS=${RUN_ABLATIONS:-true}
 
-echo "[1/4] Running base 7B inference (M3CoT)..."
+echo "[1/6] Running base 7B inference (M3CoT)..."
 python infer_base.py \
   --model_id "$MODEL_ID" > infer_base_m3cot.log 2>&1
 
-echo "[2/4] Running base 7B inference (ScienceQA)..."
+echo "[2/6] Running base 7B inference (ScienceQA)..."
 python infer_sqa_base.py \
   --model_id "$MODEL_ID" > infer_base_sqa.log 2>&1
 
