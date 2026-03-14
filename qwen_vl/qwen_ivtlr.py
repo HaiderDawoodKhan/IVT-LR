@@ -5,8 +5,12 @@ from collections import namedtuple
 from transformers.models.gpt2 import GPT2LMHeadModel
 from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
 import logging
+import os
+
+LOG_DIR = os.getenv("QWEN_LOG_DIR", ".")
+os.makedirs(LOG_DIR, exist_ok=True)
 logging.basicConfig(
-    filename='qwenvl_32_infer_sqa_time_epoch4.log',
+    filename=os.path.join(LOG_DIR, 'qwenvl_32_infer_sqa_time_epoch4.log'),
     level=logging.DEBUG,         
     format='[%(asctime)s] %(message)s',  
     datefmt='%Y-%m-%d %H:%M:%S'  
@@ -32,6 +36,8 @@ class IVTLR(nn.Module):
         visual_end_id,
         num_selected_patches: int = 32,
         mask_selected_patches: bool = True,
+        split_pool_selection: bool = False,
+        new_pool_patch_count: int = None,
         model_id: str = "Qwen/Qwen2-VL-2B-Instruct",
     ):
 
@@ -47,6 +53,8 @@ class IVTLR(nn.Module):
         self.visual_end_id = visual_end_id
         self.num_selected_patches = num_selected_patches
         self.mask_selected_patches = mask_selected_patches
+        self.split_pool_selection = split_pool_selection
+        self.new_pool_patch_count = new_pool_patch_count
         self.model_id = model_id
         self.last_topk_trace = []
 
@@ -59,11 +67,93 @@ class IVTLR(nn.Module):
         # self.processor = ChameleonProcessor.from_pretrained("facebook/chameleon-7b")
         self.processor = AutoProcessor.from_pretrained(self.model_id)
 
+        if self.new_pool_patch_count is not None:
+            if self.new_pool_patch_count < 0 or self.new_pool_patch_count > self.num_selected_patches:
+                raise ValueError(
+                    "new_pool_patch_count must be between 0 and num_selected_patches"
+                )
+
+        if (
+            self.split_pool_selection
+            and self.new_pool_patch_count is None
+            and self.num_selected_patches % 2 != 0
+        ):
+            raise ValueError(
+                "num_selected_patches must be even when split_pool_selection is enabled without an explicit new_pool_patch_count"
+            )
+
     def clear_topk_trace(self):
         self.last_topk_trace = []
 
     def get_topk_trace(self):
         return self.last_topk_trace
+
+    def _get_new_pool_patch_count(self):
+        if self.new_pool_patch_count is not None:
+            return self.new_pool_patch_count
+        return self.num_selected_patches // 2
+
+    def _rank_pool_candidates(self, scores, pool_mask, source_ids, pool_name):
+        candidate_mask = pool_mask & torch.isfinite(scores) & (source_ids >= 0)
+        candidate_positions = candidate_mask.nonzero(as_tuple=False).flatten()
+        if candidate_positions.numel() == 0:
+            return []
+
+        candidate_scores = scores[candidate_positions]
+        sort_order = torch.argsort(candidate_scores, descending=True)
+        ranked_positions = candidate_positions[sort_order]
+
+        ranked_candidates = []
+        for position in ranked_positions.tolist():
+            ranked_candidates.append(
+                {
+                    "abs_idx": position,
+                    "source_id": int(source_ids[position].item()),
+                    "score": float(scores[position].item()),
+                    "pool": pool_name,
+                }
+            )
+        return ranked_candidates
+
+    def _take_unique_candidates(self, candidates, quota, excluded_source_ids=None):
+        if excluded_source_ids is None:
+            excluded_source_ids = set()
+
+        selected = []
+        selected_source_ids = set(excluded_source_ids)
+        for candidate in candidates:
+            if len(selected) >= quota:
+                break
+            source_id = candidate["source_id"]
+            if source_id in selected_source_ids:
+                continue
+            selected.append(candidate)
+            selected_source_ids.add(source_id)
+
+        return selected, selected_source_ids
+
+    def _pad_1d_tensor(self, tensor, target_len, pad_value):
+        if tensor.size(0) == target_len:
+            return tensor
+        pad_len = target_len - tensor.size(0)
+        pad_tensor = torch.full(
+            (pad_len,),
+            pad_value,
+            dtype=tensor.dtype,
+            device=tensor.device,
+        )
+        return torch.cat([tensor, pad_tensor], dim=0)
+
+    def _pad_2d_tensor(self, tensor, target_len):
+        if tensor.size(0) == target_len:
+            return tensor
+        pad_len = target_len - tensor.size(0)
+        pad_tensor = torch.zeros(
+            (pad_len, tensor.size(1)),
+            dtype=tensor.dtype,
+            device=tensor.device,
+        )
+        return torch.cat([tensor, pad_tensor], dim=0)
 
     def forward(
         self,
@@ -97,6 +187,9 @@ class IVTLR(nn.Module):
         inputs_embeds = self.embedding(input_ids)  # (B, S, D)
 
         original_mask = torch.ones((B, S), dtype=torch.bool, device=input_ids.device)
+        initial_pool_mask = torch.zeros((B, S), dtype=torch.bool, device=input_ids.device)
+        new_pool_mask = torch.zeros((B, S), dtype=torch.bool, device=input_ids.device)
+        source_index_map = torch.full((B, S), -1, dtype=torch.long, device=input_ids.device)
 
         vs_indices = (input_ids == self.visual_start_id).nonzero(as_tuple=True)
         ve_indices = (input_ids == self.visual_end_id).nonzero(as_tuple=True)
@@ -119,14 +212,11 @@ class IVTLR(nn.Module):
             image_mask_init = torch.zeros((B, S), dtype=torch.bool, device=input_ids.device)
         
 
-        max_len = 3000
-        image_mask = torch.zeros((B, max_len), dtype=torch.bool, device=input_ids.device)
-        image_mask[:, :S] = image_mask_init
-
-
         for b in range(B):
             vs, ve = vs_pos_per_batch[b], ve_pos_per_batch[b]
-            image_mask[b, vs+1:ve] = True
+            image_positions = torch.arange(ve - vs - 1, device=input_ids.device, dtype=torch.long)
+            initial_pool_mask[b, vs + 1:ve] = True
+            source_index_map[b, vs + 1:ve] = image_positions
 
         latent_indices = (input_ids == self.latent_token_id).nonzero()
         latent_lists = [
@@ -182,31 +272,123 @@ class IVTLR(nn.Module):
                 avg_attn = torch.cat(attentions, dim=1).mean(dim=1)  # (B, seq_len)
                 current_seq_len = avg_attn.size(1)
                 select_image_embeds = []
+                selected_source_ids_per_batch = []
+                inserted_counts = []
 
                 for b in range(B):
                     last_attn = avg_attn[b, end - 1]  # shape=(seq_len,)
                     vs, ve = vs_pos_per_batch[b], ve_pos_per_batch[b]
                     scores = last_attn.clone()
-                    allowed_positions = image_mask[b, :current_seq_len]  # shape=(S,)
+                    allowed_positions = (
+                        initial_pool_mask[b, :current_seq_len] | new_pool_mask[b, :current_seq_len]
+                    )
                     invalid = ~allowed_positions
                     scores[invalid] = float("-inf")
 
-                    rel_scores = scores[vs+1 : ve]  # (image_len,)
-                    topk_rel = rel_scores.topk(self.num_selected_patches, sorted=False)[1]  # rel idx
-                    abs_idxs = (vs + 1) + topk_rel
+                    current_initial_mask = initial_pool_mask[b, :current_seq_len]
+                    current_new_mask = new_pool_mask[b, :current_seq_len]
+                    current_source_ids = source_index_map[b, :current_seq_len]
+
+                    initial_candidates = self._rank_pool_candidates(
+                        scores,
+                        current_initial_mask,
+                        current_source_ids,
+                        "initial",
+                    )
+                    new_candidates = self._rank_pool_candidates(
+                        scores,
+                        current_new_mask,
+                        current_source_ids,
+                        "new",
+                    )
+
+                    if not self.split_pool_selection:
+                        selected_candidates, _ = self._take_unique_candidates(
+                            initial_candidates,
+                            self.num_selected_patches,
+                        )
+                    elif pass_idx == 0:
+                        selected_candidates, _ = self._take_unique_candidates(
+                            initial_candidates,
+                            self.num_selected_patches,
+                        )
+                    else:
+                        new_pool_quota = self._get_new_pool_patch_count()
+                        initial_pool_quota = self.num_selected_patches - new_pool_quota
+                        initial_selected, selected_source_ids = self._take_unique_candidates(
+                            initial_candidates,
+                            initial_pool_quota,
+                        )
+                        new_selected, selected_source_ids = self._take_unique_candidates(
+                            new_candidates,
+                            new_pool_quota,
+                            excluded_source_ids=selected_source_ids,
+                        )
+                        selected_candidates = initial_selected + new_selected
+
+                        if len(selected_candidates) < self.num_selected_patches:
+                            combined_candidates = sorted(
+                                initial_candidates + new_candidates,
+                                key=lambda candidate: candidate["score"],
+                                reverse=True,
+                            )
+                            filler_candidates, _ = self._take_unique_candidates(
+                                combined_candidates,
+                                self.num_selected_patches - len(selected_candidates),
+                                excluded_source_ids={
+                                    candidate["source_id"] for candidate in selected_candidates
+                                },
+                            )
+                            selected_candidates.extend(filler_candidates)
+
+                    if len(selected_candidates) != self.num_selected_patches:
+                        raise ValueError(
+                            f"Unable to select {self.num_selected_patches} unique visual embeddings at pass {pass_idx} for batch {b}"
+                        )
+
+                    abs_idxs = torch.tensor(
+                        [candidate["abs_idx"] for candidate in selected_candidates],
+                        device=input_ids.device,
+                        dtype=torch.long,
+                    )
+                    selected_source_ids = torch.tensor(
+                        [candidate["source_id"] for candidate in selected_candidates],
+                        device=input_ids.device,
+                        dtype=torch.long,
+                    )
+                    selected_pools = [candidate["pool"] for candidate in selected_candidates]
+                    topk_rel = selected_source_ids
+
                     logging.debug(f"topk_rel: {topk_rel}")
                     logging.debug(f"abs idx: {abs_idxs}")
+
                     if self.mask_selected_patches:
-                        image_mask[b, abs_idxs] = False
+                        initial_pool_mask[b, abs_idxs] = False
+                        new_pool_mask[b, abs_idxs] = False
 
                     picked = inputs_embeds[b, abs_idxs, :]  # (K, D)
                     select_image_embeds.append(picked)
+                    selected_source_ids_per_batch.append(selected_source_ids)
+                    inserted_counts.append(abs_idxs.numel())
+
+                    initial_abs_idxs = [
+                        candidate["abs_idx"] for candidate in selected_candidates if candidate["pool"] == "initial"
+                    ]
+                    new_abs_idxs = [
+                        candidate["abs_idx"] for candidate in selected_candidates if candidate["pool"] == "new"
+                    ]
                     self.last_topk_trace[b]["steps"].append(
                         {
                             "pass_idx": pass_idx,
                             "mask_selected_patches": self.mask_selected_patches,
+                            "split_pool_selection": self.split_pool_selection,
+                            "new_pool_patch_count": self._get_new_pool_patch_count() if self.split_pool_selection else 0,
                             "topk_rel": topk_rel.detach().cpu().tolist(),
                             "abs_idxs": abs_idxs.detach().cpu().tolist(),
+                            "initial_abs_idxs": initial_abs_idxs,
+                            "new_abs_idxs": new_abs_idxs,
+                            "selected_pools": selected_pools,
+                            "source_ids": selected_source_ids.detach().cpu().tolist(),
                             "embeddings": picked.detach().to(torch.float16).cpu(),
                         }
                     )
@@ -225,8 +407,13 @@ class IVTLR(nn.Module):
                 new_attention_mask = []
                 new_position_ids = []
                 new_original_mask = []
-                new_image_mask = []
+                new_initial_pool_mask = []
+                new_new_pool_mask = []
+                new_source_index_map = []
                 batch_max_len = 0
+                insert_count = inserted_counts[0]
+                if any(count != insert_count for count in inserted_counts):
+                    raise ValueError("All batch items must insert the same number of embeddings per pass")
 
                 for b in range(B):
                     end_b = end
@@ -239,7 +426,7 @@ class IVTLR(nn.Module):
                     # attention_mask
                     att_pref = attention_mask[b, :end_b]      # (end_b,)
                     att_suf  = attention_mask[b, end_b:]      # (old_len-end_b,)
-                    att_v    = torch.ones(self.num_selected_patches, device=attention_mask.device, dtype=attention_mask.dtype)
+                    att_v    = torch.ones(insert_count, device=attention_mask.device, dtype=attention_mask.dtype)
                     merged_att = torch.cat([att_pref, att_v, att_suf], dim=0)  # (new_len,)
                     new_attention_mask.append(merged_att)
 
@@ -250,16 +437,30 @@ class IVTLR(nn.Module):
                     # original_mask
                     orig_pref = original_mask[b, :end_b]       # (end_b,)
                     orig_suf  = original_mask[b, end_b:]       # (old_len-end_b,)
-                    orig_v    = torch.zeros(self.num_selected_patches, device=input_ids.device, dtype=torch.bool)
+                    orig_v    = torch.zeros(insert_count, device=input_ids.device, dtype=torch.bool)
                     merged_orig = torch.cat([orig_pref, orig_v, orig_suf], dim=0)
                     new_original_mask.append(merged_orig)
 
-                    # image_mask
-                    img_pref = image_mask[b, :end_b]
-                    img_suf  = image_mask[b, end_b:]
-                    img_v    = torch.zeros(self.num_selected_patches, device=input_ids.device, dtype=torch.bool)
-                    merged_img = torch.cat([img_pref, img_v, img_suf], dim=0)
-                    new_image_mask.append(merged_img)
+                    # initial_pool_mask
+                    init_pref = initial_pool_mask[b, :end_b]
+                    init_suf  = initial_pool_mask[b, end_b:]
+                    init_v    = torch.zeros(insert_count, device=input_ids.device, dtype=torch.bool)
+                    merged_init = torch.cat([init_pref, init_v, init_suf], dim=0)
+                    new_initial_pool_mask.append(merged_init)
+
+                    # new_pool_mask
+                    new_pref = new_pool_mask[b, :end_b]
+                    new_suf  = new_pool_mask[b, end_b:]
+                    new_v    = torch.ones(insert_count, device=input_ids.device, dtype=torch.bool)
+                    merged_new = torch.cat([new_pref, new_v, new_suf], dim=0)
+                    new_new_pool_mask.append(merged_new)
+
+                    # source_index_map
+                    src_pref = source_index_map[b, :end_b]
+                    src_suf  = source_index_map[b, end_b:]
+                    src_v    = selected_source_ids_per_batch[b]
+                    merged_src = torch.cat([src_pref, src_v, src_suf], dim=0)
+                    new_source_index_map.append(merged_src)
 
                     batch_max_len = max(batch_max_len, merged_b.size(0))
 
@@ -267,27 +468,35 @@ class IVTLR(nn.Module):
                 padded_att   = []
                 padded_pos   = []
                 padded_orig  = []
-                padded_img   = []
+                padded_init  = []
+                padded_new   = []
+                padded_src   = []
 
                 for b in range(B):
-                    emb_b = new_inputs_embeds[b]
-                    att_b = new_attention_mask[b]
-                    pos_b = new_position_ids[b]
-                    orig_b = new_original_mask[b]
-                    img_b = new_image_mask[b]
+                    emb_b = self._pad_2d_tensor(new_inputs_embeds[b], batch_max_len)
+                    att_b = self._pad_1d_tensor(new_attention_mask[b], batch_max_len, 0)
+                    pos_b = self._pad_1d_tensor(new_position_ids[b], batch_max_len, 0)
+                    orig_b = self._pad_1d_tensor(new_original_mask[b], batch_max_len, False)
+                    init_b = self._pad_1d_tensor(new_initial_pool_mask[b], batch_max_len, False)
+                    new_b = self._pad_1d_tensor(new_new_pool_mask[b], batch_max_len, False)
+                    src_b = self._pad_1d_tensor(new_source_index_map[b], batch_max_len, -1)
 
                     padded_embeds.append(emb_b.unsqueeze(0))
                     padded_att.append(att_b.unsqueeze(0))
                     padded_pos.append(pos_b.unsqueeze(0))
                     padded_orig.append(orig_b.unsqueeze(0))
-                    padded_img.append(img_b.unsqueeze(0))
+                    padded_init.append(init_b.unsqueeze(0))
+                    padded_new.append(new_b.unsqueeze(0))
+                    padded_src.append(src_b.unsqueeze(0))
 
                 inputs_embeds = torch.cat(padded_embeds, dim=0)    
                 attention_mask = torch.cat(padded_att, dim=0)      
                 position_ids    = torch.cat(padded_pos, dim=0)     
                 original_mask  = torch.cat(padded_orig, dim=0)
-                image_mask     = torch.cat(padded_img, dim=0)   # (B, new_S)
-                K = self.num_selected_patches
+                initial_pool_mask = torch.cat(padded_init, dim=0)
+                new_pool_mask = torch.cat(padded_new, dim=0)
+                source_index_map = torch.cat(padded_src, dim=0)
+                K = insert_count
                 for b in range(B):
                     for i, pos in enumerate(latent_lists[b]):
                         if pos > end:

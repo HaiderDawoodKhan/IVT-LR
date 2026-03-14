@@ -16,6 +16,10 @@ debug: False
 gradient_accumulation_steps: 8
 num_epochs: 16
 lr: !!float "4e-5"
+num_selected_patches: 32
+mask_selected_patches: True
+split_pool_selection: False
+new_pool_patch_count: null
 
 # training
 # cd qwen_vl
@@ -25,4 +29,4 @@ lr: !!float "4e-5"
 # inference
 # cd qwen_vl
 # export CUDA_VISIBLE_DEVICES=0
-# nohup python infer_base.py --model_id Qwen/Qwen2-VL-2B-Instruct > infer_base.log 2>&1 &
+# nohup python infer.py --checkpoint_path /path/to/model.pth --model_id Qwen/Qwen2-VL-2B-Instruct --top_k 32 --split_pool_selection true --new_pool_patch_count 8 > infer.log 2>&1 &

@@ -160,7 +160,10 @@ def main():
         image_token_id,
         visual_start_id,
         visual_end_id,
+        num_selected_patches=getattr(configs, "num_selected_patches", 32),
         mask_selected_patches=getattr(configs, "mask_selected_patches", True),
+        split_pool_selection=getattr(configs, "split_pool_selection", False),
+        new_pool_patch_count=getattr(configs, "new_pool_patch_count", None),
         model_id=model_id,
     )
 

@@ -10,8 +10,11 @@ import time
 from datetime import timedelta
 import argparse
 
+LOG_DIR = os.getenv("QWEN_LOG_DIR", ".")
+os.makedirs(LOG_DIR, exist_ok=True)
+
 logging.basicConfig(
-    filename='qwen_base_infer_time.log',
+    filename=os.path.join(LOG_DIR, 'qwen_base_infer_time.log'),
     level=logging.DEBUG,
     format='[%(asctime)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'

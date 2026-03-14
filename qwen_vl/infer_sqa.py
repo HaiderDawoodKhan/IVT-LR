@@ -14,8 +14,11 @@ import time
 from datetime import timedelta
 import argparse
 from experiment_reporting import write_json, write_jsonl, accuracy, build_agreement_rows
+
+LOG_DIR = os.getenv("QWEN_LOG_DIR", ".")
+os.makedirs(LOG_DIR, exist_ok=True)
 logging.basicConfig(
-    filename='qwenvl_32_infer_time.log',
+    filename=os.path.join(LOG_DIR, 'qwenvl_32_infer_time.log'),
     level=logging.DEBUG,
     format='[%(asctime)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
@@ -46,11 +49,13 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default="output", help="Directory for comparison artifacts")
     parser.add_argument("--output_prefix", type=str, default="scienceqa_compare", help="Prefix for comparison artifacts")
     parser.add_argument("--mask_selected_patches", type=str2bool, default=True, help="Whether selected top-k image patches are masked to prevent reselection")
+    parser.add_argument("--split_pool_selection", type=str2bool, default=False, help="Whether to use split-pool selection: K from original pool when false, K/2 original plus K/2 reinserted when true")
+    parser.add_argument("--new_pool_patch_count", type=int, default=None, help="When split_pool_selection is true, number of patches to draw from the reinserted pool on passes after the first; valid range is 0..top_k")
     parser.add_argument("--run_ablations", type=str2bool, default=True, help="Whether to run cumulative and non-cumulative ablations")
     return parser.parse_args()
 
 
-def load_inference_model(checkpoint_path, model_id, top_k, mask_selected_patches):
+def load_inference_model(checkpoint_path, model_id, top_k, mask_selected_patches, split_pool_selection, new_pool_patch_count):
     print(f"Using model_id: {model_id}")
     processor = AutoProcessor.from_pretrained(model_id)
     tokenizer = AutoTokenizer.from_pretrained(
@@ -107,6 +112,8 @@ def load_inference_model(checkpoint_path, model_id, top_k, mask_selected_patches
         visual_end_id=visual_end_id,
         num_selected_patches=top_k,
         mask_selected_patches=mask_selected_patches,
+        split_pool_selection=split_pool_selection,
+        new_pool_patch_count=new_pool_patch_count,
         model_id=model_id
     )
     
@@ -124,7 +131,14 @@ def load_inference_model(checkpoint_path, model_id, top_k, mask_selected_patches
     return model, processor, tokenizer
 
 args = parse_args()
-model, processor, tokenizer = load_inference_model(args.checkpoint_path, args.model_id, args.top_k, args.mask_selected_patches)
+model, processor, tokenizer = load_inference_model(
+    args.checkpoint_path,
+    args.model_id,
+    args.top_k,
+    args.mask_selected_patches,
+    args.split_pool_selection,
+    args.new_pool_patch_count,
+)
 
 os.makedirs("output", exist_ok=True)
 
@@ -170,8 +184,22 @@ test_dataset = test_dataset.map(lambda example: process_func(example, example["o
 def evaluate_and_save(eval_dataset, model, processor, args):
     model.eval()
     os.makedirs(args.output_dir, exist_ok=True)
-    embeddings_dir = os.path.join(args.output_dir, f"{args.output_prefix}_embeddings")
-    os.makedirs(embeddings_dir, exist_ok=True)
+    run_root = os.path.join(args.output_dir, args.output_prefix)
+    summaries_dir = os.path.join(run_root, "summaries")
+    results_dir = os.path.join(run_root, "results")
+    samples_dir = os.path.join(run_root, "samples")
+    agreements_dir = os.path.join(run_root, "agreements")
+    embeddings_dir = os.path.join(run_root, "embeddings")
+    generations_dir = os.path.join(run_root, "generations")
+    for folder in [
+        summaries_dir,
+        results_dir,
+        samples_dir,
+        agreements_dir,
+        embeddings_dir,
+        generations_dir,
+    ]:
+        os.makedirs(folder, exist_ok=True)
 
     full_correct = 0
     embed_correct = 0
@@ -187,7 +215,7 @@ def evaluate_and_save(eval_dataset, model, processor, args):
     total_generated_tokens = 0
     total_generate_time = 0.0
     
-    output_json_path = "sqa_output/qwen_2_scienceqa.json"
+    output_json_path = os.path.join(generations_dir, f"{args.output_prefix}_generated.json")
     
     for ex in eval_dataset:
         if args.max_samples > 0 and total >= args.max_samples:
@@ -367,12 +395,12 @@ def evaluate_and_save(eval_dataset, model, processor, args):
         "step_ablation_accuracy_non_cumulative": step_single_acc,
     }
 
-    write_json(os.path.join(args.output_dir, f"{args.output_prefix}_summary.json"), summary)
-    write_json(os.path.join(args.output_dir, f"{args.output_prefix}_full_results.json"), {"results": results})
-    write_json(os.path.join(args.output_dir, f"{args.output_prefix}_embedding_results.json"), {"results": embed_results})
-    write_jsonl(os.path.join(args.output_dir, f"{args.output_prefix}_samples.jsonl"), sample_rows)
+    write_json(os.path.join(summaries_dir, f"{args.output_prefix}_summary.json"), summary)
+    write_json(os.path.join(results_dir, f"{args.output_prefix}_full_results.json"), {"results": results})
+    write_json(os.path.join(results_dir, f"{args.output_prefix}_embedding_results.json"), {"results": embed_results})
+    write_jsonl(os.path.join(samples_dir, f"{args.output_prefix}_samples.jsonl"), sample_rows)
     agreement_rows = build_agreement_rows(sample_rows)
-    write_jsonl(os.path.join(args.output_dir, f"{args.output_prefix}_agreement.jsonl"), agreement_rows)
+    write_jsonl(os.path.join(agreements_dir, f"{args.output_prefix}_agreement.jsonl"), agreement_rows)
 
     avg_generated_tokens = total_generated_tokens / total if total > 0 else 0
     avg_time_per_sample = total_generate_time / total if total > 0 else 0
@@ -388,7 +416,7 @@ def evaluate_and_save(eval_dataset, model, processor, args):
     print(f"[FINAL] Total: {total}, Full-image Accuracy: {full_acc:.2%}")
     print(f"[FINAL] Embedding-only Accuracy: {embed_acc:.2%}")
     print(f"Results saved to: {output_json_path}")
-    print(f"Comparison artifacts saved to: {args.output_dir}")
+    print(f"Comparison artifacts saved to: {run_root}")
     
     return summary
 

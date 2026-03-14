@@ -21,8 +21,11 @@ from transformers import AutoProcessor, AutoTokenizer, Qwen2VLForConditionalGene
 from base_sft_utils import BaseSFTCollator, build_multimodal_sft_sample
 from utils import Config, set_seed
 
+LOG_DIR = os.getenv("QWEN_LOG_DIR", ".")
+os.makedirs(LOG_DIR, exist_ok=True)
+
 logging.basicConfig(
-    filename="qwenvl_base_train_scienceqa.log",
+    filename=os.path.join(LOG_DIR, "qwenvl_base_train_scienceqa.log"),
     level=logging.DEBUG,
     format="[%(asctime)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",

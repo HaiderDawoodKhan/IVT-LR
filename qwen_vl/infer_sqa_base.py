@@ -10,8 +10,11 @@ import time
 from datetime import timedelta
 import argparse
 
+LOG_DIR = os.getenv("QWEN_LOG_DIR", ".")
+os.makedirs(LOG_DIR, exist_ok=True)
+
 logging.basicConfig(
-    filename='qwen_base_sqa_infer_time.log',
+    filename=os.path.join(LOG_DIR, 'qwen_base_sqa_infer_time.log'),
     level=logging.DEBUG,
     format='[%(asctime)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
@@ -56,14 +59,15 @@ def format_prompt(example):
     image = example["image"]
 
     if choices:
-        choices_str = "\n".join([f"({chr(65+i)}).{{{choice.strip()}}}" for i, choice in enumerate(choices)])
+        choices_str = "\n".join([f"({chr(65+i)}) {choice.strip()}" for i, choice in enumerate(choices)])
         user_prompt = (
-            f"[Question]:{{{question}}}\n"
-            f"[Options]:\n{choices_str}\n"
+            f"Question: {question}\n"
+            f"Options:\n{choices_str}\n"
+            "Reply with only the option letter in parentheses, for example (A).\n"
             f"Answer:"
         )
     else:
-        user_prompt = f"[Question]:{{{question}}}\nAnswer:"
+        user_prompt = f"Question: {question}\nAnswer:"
 
     return user_prompt, answer, image
 
@@ -78,29 +82,42 @@ def process_func(example, idx):
     }
 
 
-def extract_answer(text):
-    digit_patterns = [
-        r'Therefore,?\s*the\s+answer\s+is\s+(\d)',
-        r'the\s+answer\s+is\s+(\d)',
-        r'answer\s+is:?\s*(\d)',
-    ]
-
-    for pattern in digit_patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            return int(match.group(1))
+def extract_answer(text, num_choices=None):
+    normalized_text = " ".join(text.strip().split())
 
     letter_patterns = [
-        r'Therefore,?\s*the\s+answer\s+is\s+([A-Z])',
-        r'the\s+answer\s+is\s+([A-Z])',
-        r'answer\s+is:?\s*([A-Z])',
+        r'(?:therefore,?\s*)?(?:the\s+)?answer\s+is:?\s*[\(\[\{]?\s*([A-Z])\s*[\)\]\}]?',
+        r'(?:final\s+answer|correct\s+answer|option|choice)\s*[:\-]?\s*[\(\[\{]?\s*([A-Z])\s*[\)\]\}]?',
+        r'^\s*[\(\[\{]\s*([A-Z])\s*[\)\]\}]\s*[\.,:]?',
+        r'^\s*([A-Z])\s*[\).,:\-]',
     ]
 
     for pattern in letter_patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
+        match = re.search(pattern, normalized_text, re.IGNORECASE)
         if match:
             letter = match.group(1).upper()
-            return ord(letter) - ord('A')
+            answer_idx = ord(letter) - ord('A')
+            if num_choices is None or 0 <= answer_idx < num_choices:
+                return answer_idx
+
+    digit_patterns = [
+        r'(?:therefore,?\s*)?(?:the\s+)?answer\s+is:?\s*(\d+)',
+        r'(?:final\s+answer|correct\s+answer|option|choice)\s*[:\-]?\s*(\d+)',
+        r'^\s*[\(\[\{]?\s*(\d+)\s*[\)\]\}]?\s*[\.,:]?',
+    ]
+
+    for pattern in digit_patterns:
+        match = re.search(pattern, normalized_text, re.IGNORECASE)
+        if not match:
+            continue
+        value = int(match.group(1))
+        if num_choices is not None:
+            if 0 <= value < num_choices:
+                return value
+            if 1 <= value <= num_choices:
+                return value - 1
+        else:
+            return value
 
     logging.warning(f"No answer pattern found in text: {text[:200]}")
     return -1
@@ -153,7 +170,7 @@ def evaluate_and_save(eval_dataset, model, processor, output_json_path, max_new_
         generated_text = processor.decode(generated_tokens, skip_special_tokens=True)
         total_generated_tokens += len(generated_tokens)
 
-        pred_answer = extract_answer(generated_text)
+        pred_answer = extract_answer(generated_text, num_choices=len(ex.get("choices", [])) or None)
         results[idx] = pred_answer
 
         gt_answer = ex["gt_answer"]
