@@ -20,6 +20,9 @@ MAX_SAMPLES="${MAX_SAMPLES:--1}"
 RUN_ABLATIONS="${RUN_ABLATIONS:-true}"
 NUM_LATENT_STEPS="${NUM_LATENT_STEPS:-3}"
 TOP_K="${TOP_K:-32}"
+NO_VISUAL_LATENTS="${NO_VISUAL_LATENTS:-false}"
+NO_LAST_HIDDEN_STATE="${NO_LAST_HIDDEN_STATE:-false}"
+NO_REASONING="${NO_REASONING:-false}"
 
 CHECKPOINT_PATH_M3COT="${CHECKPOINT_PATH_M3COT:-/home/csalt/.cache/huggingface/hub/models--ModalityDance--IVTLR_QWEN_M3COT/snapshots/7c3161a715861b89578706e142ceac002a8beb52/model.pth}"
 CHECKPOINT_PATH_SQA="${CHECKPOINT_PATH_SQA:-/home/csalt/.cache/huggingface/hub/models--ModalityDance--IVTLR_QWEN_SQA/snapshots/5deaff3938d5a976c1a0d69685859960f43d450a/model.pth}"
@@ -43,6 +46,9 @@ run_m3cot_ablation() {
     --mask_selected_patches "$mask_flag"
     --split_pool_selection "$split_flag"
     --run_ablations "$RUN_ABLATIONS"
+    --no_visual_latents "$NO_VISUAL_LATENTS"
+    --no_last_hidden_state "$NO_LAST_HIDDEN_STATE"
+    --no_reasoning "$NO_REASONING"
     --max_new_tokens "$MAX_NEW_TOKENS"
     --max_samples "$MAX_SAMPLES"
     --output_dir "$OUTPUT_DIR/ablations/m3cot"
@@ -71,6 +77,9 @@ run_sqa_ablation() {
     --mask_selected_patches "$mask_flag"
     --split_pool_selection "$split_flag"
     --run_ablations "$RUN_ABLATIONS"
+    --no_visual_latents "$NO_VISUAL_LATENTS"
+    --no_last_hidden_state "$NO_LAST_HIDDEN_STATE"
+    --no_reasoning "$NO_REASONING"
     --max_new_tokens "$MAX_NEW_TOKENS"
     --max_samples "$MAX_SAMPLES"
     --output_dir "$OUTPUT_DIR/ablations/scienceqa"
@@ -113,12 +122,12 @@ run_m3cot_ablation "m3cot_split_allnew_mask_off" "false" "true" "$TOP_K"
 run_sqa_ablation   "scienceqa_split_allnew_mask_on"  "true"  "true" "$TOP_K"
 run_sqa_ablation   "scienceqa_split_allnew_mask_off" "false" "true" "$TOP_K"
 
-echo "[5/5] Base model training: M3CoT + ScienceQA"
-PYTHONUNBUFFERED=1 deepspeed qwenvl_run_base.py "$M3COT_BASE_CONFIG" \
-  --deepspeed --deepspeed_config "$DEEPSPEED_CONFIG" > "$LOG_DIR/base_train_m3cot.log" 2>&1
+# echo "[5/5] Base model training: M3CoT + ScienceQA"
+# PYTHONUNBUFFERED=1 deepspeed qwenvl_run_base.py "$M3COT_BASE_CONFIG" \
+#   --deepspeed --deepspeed_config "$DEEPSPEED_CONFIG" > "$LOG_DIR/base_train_m3cot.log" 2>&1
 
-PYTHONUNBUFFERED=1 deepspeed qwenvl_run_sqa_base.py "$SQA_BASE_CONFIG" \
-  --deepspeed --deepspeed_config "$DEEPSPEED_CONFIG" > "$LOG_DIR/base_train_scienceqa.log" 2>&1
+# PYTHONUNBUFFERED=1 deepspeed qwenvl_run_sqa_base.py "$SQA_BASE_CONFIG" \
+#   --deepspeed --deepspeed_config "$DEEPSPEED_CONFIG" > "$LOG_DIR/base_train_scienceqa.log" 2>&1
 
 echo "Done."
 echo "Logs: $LOG_DIR"

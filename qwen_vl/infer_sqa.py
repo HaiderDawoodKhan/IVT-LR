@@ -52,10 +52,23 @@ def parse_args():
     parser.add_argument("--split_pool_selection", type=str2bool, default=False, help="Whether to use split-pool selection: K from original pool when false, K/2 original plus K/2 reinserted when true")
     parser.add_argument("--new_pool_patch_count", type=int, default=None, help="When split_pool_selection is true, number of patches to draw from the reinserted pool on passes after the first; valid range is 0..top_k")
     parser.add_argument("--run_ablations", type=str2bool, default=True, help="Whether to run cumulative and non-cumulative ablations")
+    parser.add_argument("--no_visual_latents", type=str2bool, default=False, help="Disable visual latent token insertion during reasoning")
+    parser.add_argument("--no_last_hidden_state", type=str2bool, default=False, help="Disable recurrent last hidden state feedback into latent positions")
+    parser.add_argument("--no_reasoning", type=str2bool, default=False, help="Disable multi-pass reasoning and run a single forward pass")
     return parser.parse_args()
 
 
-def load_inference_model(checkpoint_path, model_id, top_k, mask_selected_patches, split_pool_selection, new_pool_patch_count):
+def load_inference_model(
+    checkpoint_path,
+    model_id,
+    top_k,
+    mask_selected_patches,
+    split_pool_selection,
+    new_pool_patch_count,
+    use_visual_latents=True,
+    use_last_hidden_state=True,
+    enable_reasoning=True,
+):
     print(f"Using model_id: {model_id}")
     processor = AutoProcessor.from_pretrained(model_id)
     tokenizer = AutoTokenizer.from_pretrained(
@@ -114,6 +127,9 @@ def load_inference_model(checkpoint_path, model_id, top_k, mask_selected_patches
         mask_selected_patches=mask_selected_patches,
         split_pool_selection=split_pool_selection,
         new_pool_patch_count=new_pool_patch_count,
+        use_visual_latents=use_visual_latents,
+        use_last_hidden_state=use_last_hidden_state,
+        enable_reasoning=enable_reasoning,
         model_id=model_id
     )
     
@@ -138,6 +154,9 @@ model, processor, tokenizer = load_inference_model(
     args.mask_selected_patches,
     args.split_pool_selection,
     args.new_pool_patch_count,
+    use_visual_latents=(not args.no_visual_latents),
+    use_last_hidden_state=(not args.no_last_hidden_state),
+    enable_reasoning=(not args.no_reasoning),
 )
 
 os.makedirs("output", exist_ok=True)

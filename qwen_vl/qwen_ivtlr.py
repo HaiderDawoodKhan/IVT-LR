@@ -38,6 +38,9 @@ class IVTLR(nn.Module):
         mask_selected_patches: bool = True,
         split_pool_selection: bool = False,
         new_pool_patch_count: int = None,
+        use_visual_latents: bool = True,
+        use_last_hidden_state: bool = True,
+        enable_reasoning: bool = True,
         model_id: str = "Qwen/Qwen2-VL-2B-Instruct",
     ):
 
@@ -55,6 +58,9 @@ class IVTLR(nn.Module):
         self.mask_selected_patches = mask_selected_patches
         self.split_pool_selection = split_pool_selection
         self.new_pool_patch_count = new_pool_patch_count
+        self.use_visual_latents = use_visual_latents
+        self.use_last_hidden_state = use_last_hidden_state
+        self.enable_reasoning = enable_reasoning
         self.model_id = model_id
         self.last_topk_trace = []
 
@@ -224,6 +230,8 @@ class IVTLR(nn.Module):
             for b in range(B)
         ]
         max_n_latents = max((len(lst) for lst in latent_lists), default=0)
+        if not self.enable_reasoning:
+            max_n_latents = 0
 
         if max_n_latents > 0:
             first_latent_pos = min(lst[0] for lst in latent_lists if len(lst) > 0)
@@ -278,95 +286,104 @@ class IVTLR(nn.Module):
                 for b in range(B):
                     last_attn = avg_attn[b, end - 1]  # shape=(seq_len,)
                     vs, ve = vs_pos_per_batch[b], ve_pos_per_batch[b]
-                    scores = last_attn.clone()
-                    allowed_positions = (
-                        initial_pool_mask[b, :current_seq_len] | new_pool_mask[b, :current_seq_len]
-                    )
-                    invalid = ~allowed_positions
-                    scores[invalid] = float("-inf")
-
-                    current_initial_mask = initial_pool_mask[b, :current_seq_len]
-                    current_new_mask = new_pool_mask[b, :current_seq_len]
-                    current_source_ids = source_index_map[b, :current_seq_len]
-
-                    initial_candidates = self._rank_pool_candidates(
-                        scores,
-                        current_initial_mask,
-                        current_source_ids,
-                        "initial",
-                    )
-                    new_candidates = self._rank_pool_candidates(
-                        scores,
-                        current_new_mask,
-                        current_source_ids,
-                        "new",
-                    )
-
-                    if not self.split_pool_selection:
-                        selected_candidates, _ = self._take_unique_candidates(
-                            initial_candidates,
-                            self.num_selected_patches,
+                    if self.use_visual_latents:
+                        scores = last_attn.clone()
+                        allowed_positions = (
+                            initial_pool_mask[b, :current_seq_len] | new_pool_mask[b, :current_seq_len]
                         )
-                    elif pass_idx == 0:
-                        selected_candidates, _ = self._take_unique_candidates(
-                            initial_candidates,
-                            self.num_selected_patches,
+                        invalid = ~allowed_positions
+                        scores[invalid] = float("-inf")
+
+                        current_initial_mask = initial_pool_mask[b, :current_seq_len]
+                        current_new_mask = new_pool_mask[b, :current_seq_len]
+                        current_source_ids = source_index_map[b, :current_seq_len]
+
+                        initial_candidates = self._rank_pool_candidates(
+                            scores,
+                            current_initial_mask,
+                            current_source_ids,
+                            "initial",
                         )
+                        new_candidates = self._rank_pool_candidates(
+                            scores,
+                            current_new_mask,
+                            current_source_ids,
+                            "new",
+                        )
+
+                        if not self.split_pool_selection:
+                            selected_candidates, _ = self._take_unique_candidates(
+                                initial_candidates,
+                                self.num_selected_patches,
+                            )
+                        elif pass_idx == 0:
+                            selected_candidates, _ = self._take_unique_candidates(
+                                initial_candidates,
+                                self.num_selected_patches,
+                            )
+                        else:
+                            new_pool_quota = self._get_new_pool_patch_count()
+                            initial_pool_quota = self.num_selected_patches - new_pool_quota
+                            initial_selected, selected_source_ids = self._take_unique_candidates(
+                                initial_candidates,
+                                initial_pool_quota,
+                            )
+                            new_selected, selected_source_ids = self._take_unique_candidates(
+                                new_candidates,
+                                new_pool_quota,
+                                excluded_source_ids=selected_source_ids,
+                            )
+                            selected_candidates = initial_selected + new_selected
+
+                            if len(selected_candidates) < self.num_selected_patches:
+                                combined_candidates = sorted(
+                                    initial_candidates + new_candidates,
+                                    key=lambda candidate: candidate["score"],
+                                    reverse=True,
+                                )
+                                filler_candidates, _ = self._take_unique_candidates(
+                                    combined_candidates,
+                                    self.num_selected_patches - len(selected_candidates),
+                                    excluded_source_ids={
+                                        candidate["source_id"] for candidate in selected_candidates
+                                    },
+                                )
+                                selected_candidates.extend(filler_candidates)
+
+                        if len(selected_candidates) != self.num_selected_patches:
+                            raise ValueError(
+                                f"Unable to select {self.num_selected_patches} unique visual embeddings at pass {pass_idx} for batch {b}"
+                            )
+
+                        abs_idxs = torch.tensor(
+                            [candidate["abs_idx"] for candidate in selected_candidates],
+                            device=input_ids.device,
+                            dtype=torch.long,
+                        )
+                        selected_source_ids = torch.tensor(
+                            [candidate["source_id"] for candidate in selected_candidates],
+                            device=input_ids.device,
+                            dtype=torch.long,
+                        )
+                        selected_pools = [candidate["pool"] for candidate in selected_candidates]
+                        topk_rel = selected_source_ids
+
+                        logging.debug(f"topk_rel: {topk_rel}")
+                        logging.debug(f"abs idx: {abs_idxs}")
+
+                        if self.mask_selected_patches:
+                            initial_pool_mask[b, abs_idxs] = False
+                            new_pool_mask[b, abs_idxs] = False
+
+                        picked = inputs_embeds[b, abs_idxs, :]  # (K, D)
                     else:
-                        new_pool_quota = self._get_new_pool_patch_count()
-                        initial_pool_quota = self.num_selected_patches - new_pool_quota
-                        initial_selected, selected_source_ids = self._take_unique_candidates(
-                            initial_candidates,
-                            initial_pool_quota,
-                        )
-                        new_selected, selected_source_ids = self._take_unique_candidates(
-                            new_candidates,
-                            new_pool_quota,
-                            excluded_source_ids=selected_source_ids,
-                        )
-                        selected_candidates = initial_selected + new_selected
+                        selected_candidates = []
+                        abs_idxs = torch.empty((0,), device=input_ids.device, dtype=torch.long)
+                        selected_source_ids = torch.empty((0,), device=input_ids.device, dtype=torch.long)
+                        selected_pools = []
+                        topk_rel = selected_source_ids
+                        picked = inputs_embeds[b, abs_idxs, :]  # (0, D)
 
-                        if len(selected_candidates) < self.num_selected_patches:
-                            combined_candidates = sorted(
-                                initial_candidates + new_candidates,
-                                key=lambda candidate: candidate["score"],
-                                reverse=True,
-                            )
-                            filler_candidates, _ = self._take_unique_candidates(
-                                combined_candidates,
-                                self.num_selected_patches - len(selected_candidates),
-                                excluded_source_ids={
-                                    candidate["source_id"] for candidate in selected_candidates
-                                },
-                            )
-                            selected_candidates.extend(filler_candidates)
-
-                    if len(selected_candidates) != self.num_selected_patches:
-                        raise ValueError(
-                            f"Unable to select {self.num_selected_patches} unique visual embeddings at pass {pass_idx} for batch {b}"
-                        )
-
-                    abs_idxs = torch.tensor(
-                        [candidate["abs_idx"] for candidate in selected_candidates],
-                        device=input_ids.device,
-                        dtype=torch.long,
-                    )
-                    selected_source_ids = torch.tensor(
-                        [candidate["source_id"] for candidate in selected_candidates],
-                        device=input_ids.device,
-                        dtype=torch.long,
-                    )
-                    selected_pools = [candidate["pool"] for candidate in selected_candidates]
-                    topk_rel = selected_source_ids
-
-                    logging.debug(f"topk_rel: {topk_rel}")
-                    logging.debug(f"abs idx: {abs_idxs}")
-
-                    if self.mask_selected_patches:
-                        initial_pool_mask[b, abs_idxs] = False
-                        new_pool_mask[b, abs_idxs] = False
-
-                    picked = inputs_embeds[b, abs_idxs, :]  # (K, D)
                     select_image_embeds.append(picked)
                     selected_source_ids_per_batch.append(selected_source_ids)
                     inserted_counts.append(abs_idxs.numel())
@@ -396,7 +413,7 @@ class IVTLR(nn.Module):
                 select_image_embeds = torch.stack(select_image_embeds, dim=0)  # (B, K, D)
                 inputs_embeds_detached = inputs_embeds.detach().clone()
                 for b in range(B):
-                    if len(latent_lists[b]) > pass_idx:
+                    if len(latent_lists[b]) > pass_idx and self.use_last_hidden_state:
                         t_idx = latent_lists[b][pass_idx]
                         rel_pos = t_idx - 1 - hidden_states_offset
                         rel_pos = max(0, min(rel_pos, hidden_states.size(1) - 1))
